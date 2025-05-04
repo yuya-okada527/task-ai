@@ -63,11 +63,111 @@ classDiagram
   "event_id": "1234567890",
   "task_id": "12345",
   "event_type": "TaskUpdated",
-  "payload": {
+  "before": {
     "title": "タスクのタイトル",
     "description": "タスクの説明",
     "status": "in_progress"
+  },
+  "after": {
+    "title": "タスクの新しいタイトル",
+    "description": "タスクの新しい説明",
+    "status": "done"
   }
 }
 ```
 
+## MCPインターフェース
+
+### ツール
+
+#### create_task
+
+##### インプット
+```json
+{
+  "title": "タスクのタイトル",
+  "description": "タスクの説明",
+}
+```
+
+##### アウトプット
+```json
+{
+  "task_id": "12345"
+}
+```
+
+#### update_task
+
+##### インプット
+```json
+{
+  "task_id": "12345",
+  "title": "タスクのタイトル",
+  "description": "タスクの説明",
+  "status": "in_progress"
+}
+```
+##### アウトプット
+```json
+{
+  "task_id": "12345"
+}
+```
+
+- list_tasks
+
+##### インプット
+```json
+{}
+```
+
+##### アウトプット
+
+```json
+{
+  "tasks": [
+    {
+      "task_id": "12345",
+      "title": "タスクのタイトル",
+      "description": "タスクの説明",
+      "status": "todo"
+    },
+    {
+      "task_id": "67890",
+      "title": "タスクのタイトル2",
+      "description": "タスクの説明2",
+      "status": "in_progress"
+    }
+  ]
+}
+```
+
+#### get_task
+
+##### インプット
+```json
+{
+  "task_id": "12345"
+}
+```
+
+##### アウトプット
+```json
+{
+  "task_id": "12345",
+  "title": "タスクのタイトル",
+  "description": "タスクの説明",
+  "status": "todo",
+  "history": [
+    {
+      "event_id": "1234567890",
+      "message": "タスクが作成されました",
+    },
+    {
+      "event_id": "0987654321",
+      "message": "タイトルが~から〜に変更されました",
+    }
+  ]
+}
+```
