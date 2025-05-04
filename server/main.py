@@ -1,6 +1,7 @@
 from enum import Enum
 from typing import List, Dict, Any
 import uuid
+import json
 
 # Task Status Enum
 class TaskStatus(str, Enum):
@@ -58,7 +59,7 @@ def create_task(title: str, description: str) -> Dict[str, Any]:
     event = Event(event_type="TaskCreated", task_id=task_id, payload={
         "title": title,
         "description": description,
-        "status": task.status
+        "status": TaskStatus.TODO
     })
     event_store[task_id] = event_store.get(task_id, []) + [event]
 
@@ -80,9 +81,9 @@ def update_task(task_id: str, title: str, description: str, status: TaskStatus) 
             "status": status
         }
     })
-    event_store.append(event)
+    event_store[task_id] = event_store.get(task_id, []) + [event]
 
-    return {"task_id": task.id}
+    return {"task_id": task_id}
 
 def list_tasks() -> Dict[str, List[Dict[str, Any]]]:
     tasks = []
@@ -96,7 +97,7 @@ def list_tasks() -> Dict[str, List[Dict[str, Any]]]:
                 "title": task.title,
                 "description": task.description,
                 "status": task.status
-            } for task in tasks.values()
+            } for task in tasks
         ]
     }
 
@@ -124,6 +125,21 @@ def get_task(task_id: str) -> Dict[str, Any]:
 
 def main():
     print("Server is running...")
+
+    # Example usage
+    example_task = create_task("Example Task", "This is an example task.")
+    print(json.dumps(example_task, indent=4))
+
+    updated_task = update_task(
+        example_task["task_id"], "Updated Task", "Updated description", TaskStatus.IN_PROGRESS
+    )
+    print(json.dumps(updated_task, indent=4))
+
+    all_tasks = list_tasks()
+    print(json.dumps(all_tasks, indent=4))
+
+    task_details = get_task(example_task["task_id"])
+    print(json.dumps(task_details, indent=4))
 
 if __name__ == "__main__":
     main()
