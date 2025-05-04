@@ -152,4 +152,4 @@ def main():
 
 if __name__ == "__main__":
     print("Starting MCP server in stdio mode")
-    mcp.run(transport="stdio")
+    mcp.run(transport="sse")
