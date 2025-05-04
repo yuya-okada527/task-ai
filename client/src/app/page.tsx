@@ -3,8 +3,7 @@
 import { useChat } from "@ai-sdk/react";
 
 export default function Chat() {
-  const { messages, input, handleInputChange, handleSubmit, status } =
-    useChat();
+  const { messages, input, handleInputChange, handleSubmit, status } = useChat();
   return (
     <div className="flex flex-col w-full max-w-md py-24 mx-auto gap-4">
       <h1 className="text-2xl font-bold">Chat with OpenAI</h1>
