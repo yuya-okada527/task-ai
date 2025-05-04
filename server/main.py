@@ -3,6 +3,10 @@ from typing import List, Dict, Any
 import uuid
 import json
 
+from mcp.server.fastmcp import FastMCP
+
+mcp = FastMCP("Task AI DEMO", debug=True)
+
 # Task Status Enum
 class TaskStatus(str, Enum):
     TODO = "todo"
@@ -50,7 +54,7 @@ def replay_task(task_id: str) -> Task:
     return task
 
 
-# MCP Interface Functions
+@mcp.tool()
 def create_task(title: str, description: str) -> Dict[str, Any]:
 
     task_id = str(uuid.uuid4())
@@ -65,6 +69,7 @@ def create_task(title: str, description: str) -> Dict[str, Any]:
 
     return {"task_id": task_id}
 
+@mcp.tool()
 def update_task(task_id: str, title: str, description: str, status: TaskStatus) -> Dict[str, Any]:
     before_task = replay_task(task_id)
 
@@ -85,6 +90,8 @@ def update_task(task_id: str, title: str, description: str, status: TaskStatus) 
 
     return {"task_id": task_id}
 
+
+@mcp.tool()
 def list_tasks() -> Dict[str, List[Dict[str, Any]]]:
     tasks = []
     for task_id, events in event_store.items():
@@ -101,6 +108,8 @@ def list_tasks() -> Dict[str, List[Dict[str, Any]]]:
         ]
     }
 
+
+@mcp.tool()
 def get_task(task_id: str) -> Dict[str, Any]:
     task = replay_task(task_id)
     events = event_store.get(task_id, [])
@@ -142,4 +151,5 @@ def main():
     print(json.dumps(task_details, indent=4))
 
 if __name__ == "__main__":
-    main()
+    print("Starting MCP server in stdio mode")
+    mcp.run(transport="stdio")
