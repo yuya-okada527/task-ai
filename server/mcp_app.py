@@ -192,9 +192,6 @@ def get_task(task_id: str) -> Dict[str, Any]:
 def main():
     print("Server is running...")
 
-    print("Deleting event store...")
-    delete_events_from_file()
-
     # Example usage
     example_task = create_task("Example Task", "This is an example task.")
     print(json.dumps(example_task, indent=4))
@@ -211,7 +208,7 @@ def main():
     print(json.dumps(task_details, indent=4))
 
 if __name__ == "__main__":
-    is_test_mode = True
+    is_test_mode = os.getenv("IS_TEST_MODE", "false").lower() == "true"
     if is_test_mode:
         main()
     else:
