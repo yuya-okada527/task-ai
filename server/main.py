@@ -31,7 +31,7 @@ class Event:
         self.payload = payload
 
 # File path for the event store
-EVENT_STORE_FILE = "event_store.json"
+EVENT_STORE_FILE = "storage/event_store.json"
 
 # Load events from the file if it exists
 def load_events_from_file() -> Dict[str, List[Event]]:
@@ -50,6 +50,11 @@ def load_events_from_file() -> Dict[str, List[Event]]:
                 ] for task_id, events in raw_events.items()
             }
     return {}
+
+def delete_events_from_file():
+    if os.path.exists(EVENT_STORE_FILE):
+        with open(EVENT_STORE_FILE, "w") as file:
+            file.write("{}")
 
 # Save events to the file
 def save_event_to_file(event):
@@ -72,12 +77,9 @@ def save_event_to_file(event):
     with open(EVENT_STORE_FILE, "w") as file:
         json.dump(serializable_events, file, indent=4)
 
-# Initialize the in-memory event store from the file
-event_store = load_events_from_file()
-
-
 def replay_task(task_id: str) -> Task:
-    if task_id not in event_store:
+    event_store = load_events_from_file()
+    if task_id not in load_events_from_file():
         raise ValueError("Task not found")
     
     # Replay the events to reconstruct the task
@@ -85,14 +87,14 @@ def replay_task(task_id: str) -> Task:
     task = Task(id=task_id, title="", description="", status=TaskStatus.TODO)
 
     for event in events:
-        if event["event_type"] == "TaskCreated":
-            task.title = event["payload"]["title"]
-            task.description = event["payload"]["description"]
-            task.status = event["payload"]["status"]
-        elif event["event_type"] == "TaskUpdated":
-            task.title = event["payload"]["after"]["title"]
-            task.description = event["payload"]["after"]["description"]
-            task.status = event["payload"]["after"]["status"]
+        if event.event_type == "TaskCreated":
+            task.title = event.payload["title"]
+            task.description = event.payload["description"]
+            task.status = event.payload["status"]
+        elif event.event_type == "TaskUpdated":
+            task.title = event.payload["after"]["title"]
+            task.description = event.payload["after"]["description"]
+            task.status = event.payload["after"]["status"]
 
     return task
 
@@ -103,16 +105,16 @@ def create_task(title: str, description: str) -> Dict[str, Any]:
     task_id = str(uuid.uuid4())
 
     # Log the event
-    event = {
-        "event_id": str(uuid.uuid4()),
-        "event_type": "TaskCreated",
-        "task_id": task_id,
-        "payload": {
+    event = Event(
+        event_id=str(uuid.uuid4()),
+        event_type="TaskCreated",
+        task_id=task_id,
+        payload={
             "title": title,
             "description": description,
             "status": TaskStatus.TODO
         }
-    }
+    )
     save_event_to_file(event)
 
     return {"task_id": task_id}
@@ -122,11 +124,11 @@ def update_task(task_id: str, title: str, description: str, status: TaskStatus) 
     before_task = replay_task(task_id)
 
     # Log the event
-    event = {
-        "event_id": str(uuid.uuid4()),
-        "event_type": "TaskUpdated",
-        "task_id": task_id,
-        "payload": {
+    event = Event(
+        event_id=str(uuid.uuid4()),
+        event_type="TaskUpdated",
+        task_id=task_id,
+        payload={
             "before": {
                 "title": before_task.title,
                 "description": before_task.description,
@@ -138,7 +140,7 @@ def update_task(task_id: str, title: str, description: str, status: TaskStatus) 
                 "status": status
             }
         }
-    }
+    )
     save_event_to_file(event)
 
     return {"task_id": task_id}
@@ -147,6 +149,7 @@ def update_task(task_id: str, title: str, description: str, status: TaskStatus) 
 @mcp.tool()
 def list_tasks() -> Dict[str, List[Dict[str, Any]]]:
     tasks = []
+    event_store = load_events_from_file()
     for task_id, events in event_store.items():
         task = replay_task(task_id)
         tasks.append(task)
@@ -165,14 +168,15 @@ def list_tasks() -> Dict[str, List[Dict[str, Any]]]:
 @mcp.tool()
 def get_task(task_id: str) -> Dict[str, Any]:
     task = replay_task(task_id)
+    event_store = load_events_from_file()
     events = event_store.get(task_id, [])
 
     # Retrieve task history
     history = [
         {
-            "event_id": event["event_id"],
-            "message": f"{event['event_type']} event occurred",
-            "payload": event["payload"]
+            "event_id": event.event_id,
+            "message": f"{event.event_type} event occurred",
+            "payload": event.payload
         }
         for event in events
     ]
@@ -187,6 +191,9 @@ def get_task(task_id: str) -> Dict[str, Any]:
 
 def main():
     print("Server is running...")
+
+    print("Deleting event store...")
+    delete_events_from_file()
 
     # Example usage
     example_task = create_task("Example Task", "This is an example task.")
@@ -204,5 +211,9 @@ def main():
     print(json.dumps(task_details, indent=4))
 
 if __name__ == "__main__":
-    print("Starting MCP server in stdio mode")
-    mcp.run(transport="sse")
+    is_test_mode = True
+    if is_test_mode:
+        main()
+    else:
+        print("Starting MCP server in stdio mode")
+        mcp.run(transport="sse")
