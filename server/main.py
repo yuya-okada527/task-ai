@@ -2,6 +2,7 @@ from enum import Enum
 from typing import List, Dict, Any
 import uuid
 import json
+import os
 
 from mcp.server.fastmcp import FastMCP
 
@@ -23,14 +24,56 @@ class Task:
 
 # Event Model
 class Event:
-    def __init__(self, event_type: str, task_id: str, payload: Dict[str, Any]):
-        self.event_id = str(uuid.uuid4())
+    def __init__(self, event_id: str, event_type: str, task_id: str, payload: Dict[str, Any]):
+        self.event_id = event_id
         self.event_type = event_type
         self.task_id = task_id
         self.payload = payload
 
-# In-memory Event Store
-event_store: Dict[str, List[Event]] = {}
+# File path for the event store
+EVENT_STORE_FILE = "event_store.json"
+
+# Load events from the file if it exists
+def load_events_from_file() -> Dict[str, List[Event]]:
+    if os.path.exists(EVENT_STORE_FILE):
+        with open(EVENT_STORE_FILE, "r") as file:
+            raw_events = json.load(file)
+            # Convert raw JSON data to Event objects
+            return {
+                task_id: [
+                    Event(
+                        event_id=event["event_id"],
+                        event_type=event["event_type"],
+                        task_id=event["task_id"],
+                        payload=event["payload"]
+                    ) for event in events
+                ] for task_id, events in raw_events.items()
+            }
+    return {}
+
+# Save events to the file
+def save_event_to_file(event):
+    all_events = load_events_from_file()
+    task_id = event.task_id
+    if task_id not in all_events:
+        all_events[task_id] = []
+    all_events[task_id].append(event)
+    # Convert Event objects to dictionaries for JSON serialization
+    serializable_events = {
+        task_id: [
+            {
+                "event_id": e.event_id,
+                "event_type": e.event_type,
+                "task_id": e.task_id,
+                "payload": e.payload
+            } for e in events
+        ] for task_id, events in all_events.items()
+    }
+    with open(EVENT_STORE_FILE, "w") as file:
+        json.dump(serializable_events, file, indent=4)
+
+# Initialize the in-memory event store from the file
+event_store = load_events_from_file()
 
 
 def replay_task(task_id: str) -> Task:
@@ -42,14 +85,14 @@ def replay_task(task_id: str) -> Task:
     task = Task(id=task_id, title="", description="", status=TaskStatus.TODO)
 
     for event in events:
-        if event.event_type == "TaskCreated":
-            task.title = event.payload["title"]
-            task.description = event.payload["description"]
-            task.status = event.payload["status"]
-        elif event.event_type == "TaskUpdated":
-            task.title = event.payload["after"]["title"]
-            task.description = event.payload["after"]["description"]
-            task.status = event.payload["after"]["status"]
+        if event["event_type"] == "TaskCreated":
+            task.title = event["payload"]["title"]
+            task.description = event["payload"]["description"]
+            task.status = event["payload"]["status"]
+        elif event["event_type"] == "TaskUpdated":
+            task.title = event["payload"]["after"]["title"]
+            task.description = event["payload"]["after"]["description"]
+            task.status = event["payload"]["after"]["status"]
 
     return task
 
@@ -60,12 +103,17 @@ def create_task(title: str, description: str) -> Dict[str, Any]:
     task_id = str(uuid.uuid4())
 
     # Log the event
-    event = Event(event_type="TaskCreated", task_id=task_id, payload={
-        "title": title,
-        "description": description,
-        "status": TaskStatus.TODO
-    })
-    event_store[task_id] = event_store.get(task_id, []) + [event]
+    event = {
+        "event_id": str(uuid.uuid4()),
+        "event_type": "TaskCreated",
+        "task_id": task_id,
+        "payload": {
+            "title": title,
+            "description": description,
+            "status": TaskStatus.TODO
+        }
+    }
+    save_event_to_file(event)
 
     return {"task_id": task_id}
 
@@ -74,19 +122,24 @@ def update_task(task_id: str, title: str, description: str, status: TaskStatus) 
     before_task = replay_task(task_id)
 
     # Log the event
-    event = Event(event_type="TaskUpdated", task_id=task_id, payload={
-        "before": {
-            "title": before_task.title,
-            "description": before_task.description,
-            "status": before_task.status
-        },
-        "after": {
-            "title": title,
-            "description": description,
-            "status": status
+    event = {
+        "event_id": str(uuid.uuid4()),
+        "event_type": "TaskUpdated",
+        "task_id": task_id,
+        "payload": {
+            "before": {
+                "title": before_task.title,
+                "description": before_task.description,
+                "status": before_task.status
+            },
+            "after": {
+                "title": title,
+                "description": description,
+                "status": status
+            }
         }
-    })
-    event_store[task_id] = event_store.get(task_id, []) + [event]
+    }
+    save_event_to_file(event)
 
     return {"task_id": task_id}
 
@@ -117,9 +170,9 @@ def get_task(task_id: str) -> Dict[str, Any]:
     # Retrieve task history
     history = [
         {
-            "event_id": event.event_id,
-            "message": f"{event.event_type} event occurred",
-            "payload": event.payload
+            "event_id": event["event_id"],
+            "message": f"{event['event_type']} event occurred",
+            "payload": event["payload"]
         }
         for event in events
     ]
