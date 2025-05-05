@@ -30,11 +30,6 @@ def load_events_from_file() -> Dict[str, List[Event]]:
             }
     return {}
 
-def delete_events_from_file():
-    if os.path.exists(EVENT_STORE_FILE):
-        with open(EVENT_STORE_FILE, "w") as file:
-            file.write("{}")
-
 # Save events to the file
 def save_event_to_file(event):
     all_events = load_events_from_file()
