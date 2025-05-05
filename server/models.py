@@ -22,3 +22,24 @@ class Event:
         self.event_type = event_type
         self.task_id = task_id
         self.payload = payload
+
+# Replay task function
+def replay_task(events: list[Event]) -> Task:
+    if not events:
+        raise ValueError("No events provided for the task")
+
+    # Replay the events to reconstruct the task
+    task = Task(id="", title="", description="", status=TaskStatus.TODO)
+
+    for event in events:
+        if event.event_type == "TaskCreated":
+            task.id = event.task_id
+            task.title = event.payload["title"]
+            task.description = event.payload["description"]
+            task.status = event.payload["status"]
+        elif event.event_type == "TaskUpdated":
+            task.title = event.payload["after"]["title"]
+            task.description = event.payload["after"]["description"]
+            task.status = event.payload["after"]["status"]
+
+    return task

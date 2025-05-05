@@ -5,32 +5,10 @@ import json
 import os
 
 from mcp.server.fastmcp import FastMCP
-from models import TaskStatus, Task, Event
+from models import TaskStatus, Task, Event, replay_task
 from storage import load_events_from_file, save_event_to_file
 
 mcp = FastMCP("Task AI DEMO", debug=True)
-
-def replay_task(task_id: str) -> Task:
-    event_store = load_events_from_file()
-    if task_id not in load_events_from_file():
-        raise ValueError("Task not found")
-    
-    # Replay the events to reconstruct the task
-    events = event_store[task_id]
-    task = Task(id=task_id, title="", description="", status=TaskStatus.TODO)
-
-    for event in events:
-        if event.event_type == "TaskCreated":
-            task.title = event.payload["title"]
-            task.description = event.payload["description"]
-            task.status = event.payload["status"]
-        elif event.event_type == "TaskUpdated":
-            task.title = event.payload["after"]["title"]
-            task.description = event.payload["after"]["description"]
-            task.status = event.payload["after"]["status"]
-
-    return task
-
 
 @mcp.tool()
 def create_task(title: str, description: str) -> Dict[str, Any]:
@@ -54,7 +32,8 @@ def create_task(title: str, description: str) -> Dict[str, Any]:
 
 @mcp.tool()
 def update_task(task_id: str, title: str, description: str, status: TaskStatus) -> Dict[str, Any]:
-    before_task = replay_task(task_id)
+    events = load_events_from_file().get(task_id, [])
+    before_task = replay_task(events)
 
     # Log the event
     event = Event(
@@ -84,7 +63,7 @@ def list_tasks() -> Dict[str, List[Dict[str, Any]]]:
     tasks = []
     event_store = load_events_from_file()
     for task_id, events in event_store.items():
-        task = replay_task(task_id)
+        task = replay_task(event_store.get(task_id, []))
         tasks.append(task)
     return {
         "tasks": [
@@ -100,9 +79,9 @@ def list_tasks() -> Dict[str, List[Dict[str, Any]]]:
 
 @mcp.tool()
 def get_task(task_id: str) -> Dict[str, Any]:
-    task = replay_task(task_id)
     event_store = load_events_from_file()
     events = event_store.get(task_id, [])
+    task = replay_task(events)
 
     # Retrieve task history
     history = [
