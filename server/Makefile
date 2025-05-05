@@ -5,7 +5,7 @@ ca:
 run_mcp:
 	uv run mcp_app.py
 run_api:
-	uv run api_app.py
+	uv run uvicorn api_app:app --reload --port 8001
 test:
 	IS_TEST_MODE=True uv run mcp_app.py
 delete:
